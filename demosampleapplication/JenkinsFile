@@ -1,0 +1,74 @@
+pipeline {
+  agent any
+  environment{
+      registry = 'kashyapabhishek123/jenkins'
+      username = 'kashyapabhishek123'
+      creds = credentials('Docker')
+  }
+  
+  tools {
+    maven 'Maven'
+    dockerTool 'my-docker'
+  }
+  
+  options{
+      timestamps()
+      timeout(time: 1, unit: 'HOURS')
+
+  }
+  stages {
+    
+        stage('Code checkout from GitHub') {
+            steps{
+                git url: 'https://github.com/abhishekkashyapsudo/jenkins.git'
+            }
+        }  
+        stage('Compile/Build the code ') {
+            steps{
+                sh 'mvn -f demosampleapplication/pom.xml clean install'
+            }
+        }
+        stage('Execute Unit test cases') {
+            steps{
+                sh 'mvn -f demosampleapplication/pom.xml test'
+            }
+        }
+        stage('Perform Code Analysis') {
+            steps{
+                withSonarQubeEnv(credentialsId: 'Sonar', installationName: 'Sonar') {
+                   sh 'mvn -f demosampleapplication/pom.xml sonar:sonar -Dsonar.projectKey=Test -Dsonar.host.url=http://localhost:8112'
+                }
+            }
+            
+        }
+        stage('Create Docker Image') {
+            steps{
+                script {
+                    sh 'docker build -t ${registry}:${BUILD_NUMBER} . -f demosampleapplication/Dockerfile' 
+                }
+            }
+        }
+        stage('Push Docker Image to Docker Hub') {
+            steps{
+                script {
+                    sh 'docker login -u $creds_USR -p $creds_PSW'
+                    sh 'docker push ${registry}:${BUILD_NUMBER}'
+                }
+            }
+        }
+        stage('Docker Deployment (Port 7100)') {
+            steps{
+                script {
+                    sh 'docker container run -d --publish 7100:8080 ${registry}:${BUILD_NUMBER}'
+                }
+            }
+        }
+         
+    }
+    
+    post {
+        always {
+            junit 'demosampleapplication/target/surefire-reports/*.xml'
+        }
+    }
+}
