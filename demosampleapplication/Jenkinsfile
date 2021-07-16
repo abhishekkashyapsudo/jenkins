@@ -3,7 +3,7 @@ pipeline {
   environment{
       registry = 'kashyapabhishek123/i-abhishekkashyap-master'
       username = 'kashyapabhishek123'
-      creds = credentials('Test_Docker')
+      creds = credentials('DockerHub')
   }
   
   tools {
